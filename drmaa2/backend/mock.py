@@ -44,7 +44,7 @@ class MonitoringSession(drmaa2.MonitoringSession):
     def get_all_reservations(self):
         return []
 
-    def get_all_jobs(self, filter):
+    def get_all_jobs(self, the_filter):
         return []
 
     def get_all_queues(self, names):
@@ -62,7 +62,7 @@ class JobSession:
     session_name = None
     job_categories = None
 
-    def get_jobs(self, filter):
+    def get_jobs(self, the_filter):
         return []
 
     def get_job_array(self, job_array_id):

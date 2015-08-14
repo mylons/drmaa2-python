@@ -221,7 +221,7 @@ class JobSession:
     job_categories = None
 
     @abstractmethod
-    def get_jobs(self, filter=None):
+    def get_jobs(self, the_filter=None):
         """ get_jobs(self, JobInfo) -> list
 
             This method returns a list of job objects that belong to the job session.
@@ -422,7 +422,7 @@ class MonitoringSession:
         pass
 
     @abstractmethod
-    def get_all_jobs(self, filter=None):
+    def get_all_jobs(self, the_filter=None):
         """ get_all_jobs(self, JobInfo) -> list
 
             This method returns a list of Job objects, representing all DRMS jobs visible to the user running
