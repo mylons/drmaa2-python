@@ -1,6 +1,10 @@
 import unittest
 import drmaa2
+import os
 
+
+
+QSUB_OUTPUT = "Your job 764188 (\"lyonstest\") has been submitted"
 
 class GeneralTestCase(unittest.TestCase):
     def test_struct_empty_init(self):
@@ -17,12 +21,13 @@ class GeneralTestCase(unittest.TestCase):
     def test_struct_backend_specific_attrs(self):
         """ Test that implementation-specific attributes are supported. """
         jt = drmaa2.JobTemplate()
-        self.assertEqual(jt.mock_testattr, None)
+        # TODO test more of the members here, the ones i care about especially
+        self.assertEqual(jt.parallel_environment, None)
 
 
 class SessionManagerTestCase(unittest.TestCase):
     def test_describe_attribute(self):
-        drmaa2.describe_attribute(drmaa2.Notification(), "sessionName")
+        drmaa2.describe_attribute(drmaa2.Notification(), "session_name")
 
     def test_supports(self):
         self.assertEqual(drmaa2.supports(drmaa2.Capability.CALLBACK), True)
@@ -68,15 +73,22 @@ class MonitoringSessionTestCase(unittest.TestCase):
 
 
 class JobSessionTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.script_path = "/tmp/drmaa2.sge"
+
+    def tearDown(self):
+        os.remove(self.script_path)
+
     def test_run_job_with_contact(self):
-        session = drmaa2.create_job_session("sessioName", "contact")
-        jt = drmaa2.JobTemplate({'remoteCommand': '/bin/sleep'})
+        session = drmaa2.create_job_session("session_name", "contact")
+        jt = drmaa2.JobTemplate(remote_command='/bin/sleep', script_path=self.script_path)
         job = session.run_job(jt)
         job.wait_terminated(drmaa2.INFINITE_TIME)
 
     def test_run_job_without_contact(self):
         session = drmaa2.create_job_session()
-        jt = drmaa2.JobTemplate({'remoteCommand': '/bin/sleep'})
+        jt = drmaa2.JobTemplate(remote_command='/bin/sleep', script_path=self.script_path)
         job = session.run_job(jt)
         job.wait_terminated(drmaa2.INFINITE_TIME)
 
