@@ -6,7 +6,7 @@ This repository offers an implementation for the DRMAA2 Python language.
 
 If you don't know what DRMAA is, please consult http://www.drmaa.org.
 
-The code base is maintained @mylons. The intention to implement a version of the drmaa2 api without relying on C libs. This is pure python.
+The code base is maintained https://github.com/mylons. The intention to implement a version of the drmaa2 api without relying on C libs. This is pure python.
 
 The `drmaa2/__init__.py` file is expected to remain untouched. If you see a need to change it, please talk to us, in order to maintain portability and standard compliance across all implementations.
 
