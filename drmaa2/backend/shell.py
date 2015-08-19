@@ -4,13 +4,32 @@
 
     For further information, please visit drmaa.org.
 """
+from operator import attrgetter
+import os
 
 import drmaa2
 
-# Definition part
+import collections
 
-job_template_impl_spec = ['shell_testattr']
-job_info_impl_spec = []
+# Definition part
+from drmaa2.util import render_template
+from drmaa2.util.ge import qacct, parse_qacct, qsub, parse_qsub_output
+# taken directly from output of qacct
+common_job = ['qname', 'hostname', 'group', 'owner', 'project', 'department', 'jobname', 'jobnumber', 'taskid',
+              'account', 'failed', 'cpu', 'mem', 'io', 'iow', 'maxvmem', 'arid', 'jc_name',
+              ]
+job_template_impl_spec = common_job + [
+    # the below are added by me because there's nothing that makes sense for this
+    'parallel_environment', 'export_environment_variables', 'is_binary_file', 'use_cwd',
+    'job_depends_on', 'job_is_array', 'array_task_first', 'array_task_last', 'array_task_step_size',
+    'script_path'
+]
+job_info_impl_spec = common_job + [
+    'qsub_time', 'start_time', 'end_time', 'granted_pe',
+    'ru_wallclock', 'ru_utime', 'ru_stime', 'ru_maxrss',
+    'ru_ixrss', 'ru_ismrss', 'ru_idrss', 'ru_isrss', 'ru_minflt', 'ru_majflt', 'ru_nswap',
+    'ru_inblock', 'ru_oublock', 'ru_msgsnd', 'ru_msgrcv', 'ru_nsignals', 'ru_nvcsw', 'ru_nivcsw',
+]
 reservation_template_impl_spec = []
 reservation_info_impl_spec = []
 queue_info_impl_spec = []
@@ -57,19 +76,79 @@ class MonitoringSession(drmaa2.MonitoringSession):
         pass
 
 
-class JobSession:
+class JobArray(drmaa2.JobArray, collections.Iterable):
+    """
+    # TODO implement some validation for this constration:
+    'array_task_step_size',
+                 1 <= array_task_first  <= MIN(2^31-1, max_aj_tasks)
+                 1 <= array_task_last <= MIN(2^31-1, max_aj_tasks)
+                 array_task_first <= array_task_last
+    """
+
+    def reap(self):
+        super(JobArray, self).reap()
+
+    def release(self):
+        super(JobArray, self).release()
+
+    def hold(self):
+        super(JobArray, self).hold()
+
+    def resume(self):
+        super(JobArray, self).resume()
+
+    def terminate(self):
+        super(JobArray, self).terminate()
+
+    def suspend(self):
+        super(JobArray, self).suspend()
+
+    def __init__(self, jobs=[]):
+        # sort by taskid
+        self.jobs = sorted(jobs, key=attrgetter('taskid'))
+
+    def __iter__(self):
+        return iter(self.jobs)
+
+
+class JobSession(drmaa2.JobSession):
+
     contact = None
     session_name = None
     job_categories = None
+
+    def __init__(self):
+        pass
 
     def get_jobs(self, the_filter):
         return []
 
     def get_job_array(self, job_array_id):
-        return JobArray()
+        return JobArray(parse_qacct(qacct(job_id=job_array_id)))
 
     def run_job(self, job_template):
-        return Job()
+        """
+        what does it take to run a job?
+        1: build a job object from template
+        2:  if job_template.working_directory
+                write script to that directory
+            else
+                write script to cwd and use -cwd by setting job_template.use_cwd
+        3: qsub the job
+
+
+        :param job_template: JobTemplate
+        :return: Job
+        """
+        job = Job(job_template)
+        with open(job.script_path, 'w') as script:
+            script.write(render_template(**job.job_template._asdict()))
+
+        qsub_output = qsub(job)
+        job_id, _ = parse_qsub_output(qsub_output)
+        job.job_id = job_id
+
+        return job
 
     def run_bulk_jobs(self, job_template, begin_index, end_index, step, max_parallel):
         return JobArray()
@@ -101,10 +180,17 @@ class ReservationSession:
         pass
 
 
-class Job:
-    job_id = None
+class Job(drmaa2.Job):
+
     session_name = None
-    job_template = None
+
+    def __init__(self, job_template, absolute_script_path=None, job_id=None):
+        for name, value in job_template.__dict__.iteritems():
+            setattr(self, name, value)
+        if job_template.script_path is None:
+            self.script_path = absolute_script_path
+        self._job_id = job_id
+        self._job_template = job_template
 
     def suspend(self):
         pass
@@ -135,6 +221,33 @@ class Job:
 
     def wait_terminated(self, timeout):
         pass
+
+    @property
+    def job_id(self):
+        return self._job_id
+
+    @job_id.setter
+    def job_id(self, value):
+        # maybe do some type checking here
+        self._job_id = value
+
+    @job_id.deleter
+    def job_id(self):
+        del self._job_id
+
+    @property
+    def job_template(self):
+        return self._job_template
+
+    @job_template.setter
+    def job_template(self, job_template):
+        self._job_template = job_template
+
+    @job_template.deleter
+    def job_template(self):
+        del self._job_template
+
+
 
 # Module-level functions
 

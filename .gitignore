@@ -1,1 +1,3 @@
 *.pyc
+.travis.yml
+.idea

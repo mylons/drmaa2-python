@@ -2,9 +2,12 @@ import unittest
 import drmaa2
 import os
 
-
+import mock
 
 QSUB_OUTPUT = "Your job 764188 (\"lyonstest\") has been submitted"
+
+def qsub(job):
+    return QSUB_OUTPUT
 
 class GeneralTestCase(unittest.TestCase):
     def test_struct_empty_init(self):
@@ -80,13 +83,15 @@ class JobSessionTestCase(unittest.TestCase):
     def tearDown(self):
         os.remove(self.script_path)
 
-    def test_run_job_with_contact(self):
+    @mock.patch('drmaa2.util.ge.qsub', side_effect=qsub)
+    def test_run_job_with_contact(self, mock_os):
         session = drmaa2.create_job_session("session_name", "contact")
         jt = drmaa2.JobTemplate(remote_command='/bin/sleep', script_path=self.script_path)
         job = session.run_job(jt)
         job.wait_terminated(drmaa2.INFINITE_TIME)
 
-    def test_run_job_without_contact(self):
+    @mock.patch('drmaa2.util.ge.qsub', side_effect=qsub)
+    def test_run_job_without_contact(self, mock_os):
         session = drmaa2.create_job_session()
         jt = drmaa2.JobTemplate(remote_command='/bin/sleep', script_path=self.script_path)
         job = session.run_job(jt)

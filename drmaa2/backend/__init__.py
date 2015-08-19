@@ -4,4 +4,4 @@
 
     For further information, please visit drmaa.org.
 """
-from . import mock as impl
+from . import shell as impl
