@@ -53,7 +53,7 @@ def qsub(job):
 
 
 def parse_qsub_output(qsub_output):
-    qsub_output_pat = re.compile('Your job (\d+) ("(\w+)")')
+    qsub_output_pat = re.compile('Your job (\d+) \("(\w+)"\)')
     m = qsub_output_pat.match(qsub_output)
     job_id, job_name = m.groups()
     return job_id, job_name

@@ -4,10 +4,10 @@ import os
 
 import mock
 
+from hamcrest import assert_that, starts_with, ends_with, is_, has_properties, equal_to, contains, has_item
+
 QSUB_OUTPUT = "Your job 764188 (\"lyonstest\") has been submitted"
 
-def qsub(job):
-    return QSUB_OUTPUT
 
 class GeneralTestCase(unittest.TestCase):
     def test_struct_empty_init(self):
@@ -81,22 +81,45 @@ class JobSessionTestCase(unittest.TestCase):
         self.script_path = "/tmp/drmaa2.sge"
 
     def tearDown(self):
-        os.remove(self.script_path)
+        if os.path.isfile(self.script_path):
+            os.remove(self.script_path)
 
-    @mock.patch('drmaa2.util.ge.qsub', side_effect=qsub)
-    def test_run_job_with_contact(self, mock_os):
+    @mock.patch('drmaa2.backend.shell.qsub')
+    def test_run_job_with_contact(self, mock_qsub):
+        mock_qsub.return_value = QSUB_OUTPUT
         session = drmaa2.create_job_session("session_name", "contact")
         jt = drmaa2.JobTemplate(remote_command='/bin/sleep', script_path=self.script_path)
         job = session.run_job(jt)
-        job.wait_terminated(drmaa2.INFINITE_TIME)
+        # TODO test wait terminated somehow
+        #job.wait_terminated(drmaa2.INFINITE_TIME)
 
-    @mock.patch('drmaa2.util.ge.qsub', side_effect=qsub)
-    def test_run_job_without_contact(self, mock_os):
-        session = drmaa2.create_job_session()
-        jt = drmaa2.JobTemplate(remote_command='/bin/sleep', script_path=self.script_path)
+        assert_that(job, has_properties({'remote_command': equal_to('/bin/sleep'),
+                                         'script_path': equal_to(self.script_path)}))
+
+        with open(self.script_path, 'r') as f:
+            lines = f.readlines()
+            assert_that(lines[0], starts_with('#!/usr/bin/env'))
+            assert_that(lines[0], ends_with('bash\n'))
+
+    @mock.patch('drmaa2.backend.shell.qsub')
+    def test_job_script_is_written_correctly(self, mock_qsub):
+        mock_qsub.return_value = QSUB_OUTPUT
+        session = drmaa2.create_job_session("session_name", "contact")
+        jt = drmaa2.JobTemplate(remote_command='/bin/sleep', script_path=self.script_path,
+                                queue_name='dev-short', use_cwd=True)
         job = session.run_job(jt)
-        job.wait_terminated(drmaa2.INFINITE_TIME)
 
+        assert_that(job, has_properties({'remote_command': equal_to('/bin/sleep'),
+                                         'queue_name': equal_to('dev-short'),
+                                         'use_cwd': equal_to(True),
+                                         'script_path': equal_to(self.script_path)}))
+
+        with open(self.script_path, 'r') as f:
+            lines = f.readlines()
+            assert_that(lines, has_item('#!/usr/bin/env bash\n'))
+            assert_that(lines, has_item('#$ -cwd\n'))
+            assert_that(lines, has_item('/bin/sleep\n'))
+            assert_that(lines, has_item('#$ -q dev-short\n'))
 
 if __name__ == '__main__':
     unittest.main()
