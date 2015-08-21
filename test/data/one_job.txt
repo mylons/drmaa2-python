@@ -1,0 +1,45 @@
+==============================================================
+qname        prod-r2v            
+hostname     pipeline-1a12-16l.lyons.hosting.net
+group        lyons
+owner        mike
+project      LYO
+department   Lyons Research
+jobname      lyons_research_1234
+jobnumber    647723
+taskid       undefined
+account      sge
+priority     0                   
+qsub_time    Wed Aug  5 20:52:36 2015
+start_time   Wed Aug  5 20:52:19 2015
+end_time     Wed Aug  5 20:52:45 2015
+granted_pe   smp                 
+slots        1                   
+failed       0    
+exit_status  0                   
+ru_wallclock 26           
+ru_utime     4.033        
+ru_stime     3.145        
+ru_maxrss    99532               
+ru_ixrss     0                   
+ru_ismrss    0                   
+ru_idrss     0                   
+ru_isrss     0                   
+ru_minflt    129741              
+ru_majflt    104                 
+ru_nswap     0                   
+ru_inblock   238872              
+ru_oublock   1328                
+ru_msgsnd    0                   
+ru_msgrcv    0                   
+ru_nsignals  0                   
+ru_nvcsw     30244               
+ru_nivcsw    485691              
+cpu          7.178        
+mem          3.222             
+io           0.035             
+iow          0.000             
+maxvmem      1.169G
+arid         undefined
+jc_name      NONE
+
