@@ -5,26 +5,29 @@
     For further information, please visit drmaa.org.
 """
 from operator import attrgetter
-import os
 
 import drmaa2
 
 import collections
 
 # Definition part
-from drmaa2.util import render_template
-from drmaa2.util.ge import qacct, parse_qacct, qsub, parse_qsub_output
+from drmaa2.util import render_template, namedtuple_from_dict, spec_to_reality
+from drmaa2.util.ge import qacct, parse_qacct, qsub, parse_qsub_output, qmod, qrls, qdel
 # taken directly from output of qacct
-common_job = ['qname', 'hostname', 'group', 'owner', 'project', 'department', 'jobname', 'jobnumber', 'taskid',
-              'account', 'failed', 'cpu', 'mem', 'io', 'iow', 'maxvmem', 'arid', 'jc_name',
-              ]
-job_template_impl_spec = common_job + [
+
+common_job_keys = ['qname']
+
+univa_command_line_output_keys = ['hostname', 'group', 'owner', 'project', 'department', 'jobname',
+                                  'jobnumber', 'taskid', 'account', 'failed', 'cpu', 'mem', 'io', 'iow', 'maxvmem',
+                                  'arid', 'jc_name',
+                                  ] + common_job_keys
+job_template_impl_spec = [
     # the below are added by me because there's nothing that makes sense for this
     'parallel_environment', 'export_environment_variables', 'is_binary_file', 'use_cwd',
     'job_depends_on', 'job_is_array', 'array_task_first', 'array_task_last', 'array_task_step_size',
     'script_path'
-]
-job_info_impl_spec = common_job + [
+] + common_job_keys
+job_info_impl_spec = univa_command_line_output_keys + [
     'qsub_time', 'start_time', 'end_time', 'granted_pe',
     'ru_wallclock', 'ru_utime', 'ru_stime', 'ru_maxrss',
     'ru_ixrss', 'ru_ismrss', 'ru_idrss', 'ru_isrss', 'ru_minflt', 'ru_majflt', 'ru_nswap',
@@ -113,15 +116,22 @@ class JobArray(drmaa2.JobArray, collections.Iterable):
 
 class JobSession(drmaa2.JobSession):
 
-    contact = None
+    contact = None  # in Univa it's apparently always none
     session_name = None
     job_categories = None
 
     def __init__(self):
-        pass
+        self.session_jobs = []
 
-    def get_jobs(self, the_filter):
-        return []
+    def get_jobs(self, the_filter=None):
+        """
+        :param the_filter: a function that takes a job and returns true or false
+        :return:
+        """
+        if the_filter:
+            return [job for job in self.session_jobs if the_filter(job)]
+        else:
+            return self.session_jobs
 
     def get_job_array(self, job_array_id):
         return JobArray(parse_qacct(qacct(job_id=job_array_id)))
@@ -135,18 +145,19 @@ class JobSession(drmaa2.JobSession):
             else
                 write script to cwd and use -cwd by setting job_template.use_cwd
         3: qsub the job
-
-
         :param job_template: JobTemplate
         :return: Job
         """
-        job = Job(job_template)
+        job = Job.from_template(job_template)
         with open(job.script_path, 'w') as script:
-            script.write(render_template(**job.job_template._asdict()))
+            script.write(render_template(**spec_to_reality(**job.job_template._asdict())))
 
         qsub_output = qsub(job)
-        job_id, _ = parse_qsub_output(qsub_output)
+        job_id, job_name = parse_qsub_output(qsub_output)
         job.job_id = job_id
+        job.job_name = job_name
+
+        self.session_jobs.append(job)
 
         return job
 
@@ -160,6 +171,10 @@ class JobSession(drmaa2.JobSession):
         return Job()
 
     def close(self):
+        """
+        for the command line parsing version I don't think this has to do anything at all
+        :return:
+        """
         pass
 
 
@@ -168,53 +183,74 @@ class ReservationSession:
     session_name = None
 
     def get_reservation(self, reservation_id):
-        return Reservation()
+        #return Reservation()
+        raise NotImplementedError("not sure if I will implement this one")
 
     def request_reservation(self, reservation_template):
-        return Reservation()
+        #return Reservation()
+        raise NotImplementedError("not sure if I will implement this one")
 
     def get_reservations(self):
-        return []
+        #return []
+        raise NotImplementedError("not sure if I will implement this one")
 
     def close(self):
-        pass
+        #pass
+        raise NotImplementedError("not sure if I will implement this one")
 
 
 class Job(drmaa2.Job):
 
     session_name = None
+    absolute_script_path = None
 
-    def __init__(self, job_template, absolute_script_path=None, job_id=None):
-        for name, value in job_template.__dict__.iteritems():
-            setattr(self, name, value)
-        if job_template.script_path is None:
-            self.script_path = absolute_script_path
-        self._job_id = job_id
-        self._job_template = job_template
+    def _init_from_dict(self, d):
+        fields_of_interest = set(drmaa2.JobTemplate._fields + drmaa2.JobInfo._fields)
+        for key, value in d.iteritems():
+            if key in fields_of_interest and value:
+                setattr(self, key, value)
+
+    @classmethod
+    def from_template(cls, job_template):
+        job = cls()
+        job.job_info = namedtuple_from_dict(job_template.__dict__, drmaa2.JobInfo)
+        job.job_template = job_template
+        job._init_from_dict(spec_to_reality(**job_template.__dict__))
+        return job
+
+    @classmethod
+    def from_info(cls, job_info):
+        job = cls()
+        job.job_info = job_info
+        job._init_from_dict(spec_to_reality(**job_info.__dict__))
+        return job
 
     def suspend(self):
-        pass
+        qmod(self, suspend=True)
 
     def resume(self):
-        pass
+        qrls(self, resume=True)
 
     def hold(self):
-        pass
+        qrls(self, hold=True)
 
     def release(self):
-        pass
+        self.resume(self)
 
     def terminate(self):
-        pass
+        qdel(self)
 
     def reap(self):
+        # TODO gotta think about this one
         pass
 
     def get_state(self):
+        # TODO where does state come from?
         return JobState.RUNNING, "Running like hell."
 
     def get_info(self):
-        return JobInfo()
+        # output of qacct
+        return self.job_info
 
     def wait_started(self, timeout):
         pass
@@ -246,7 +282,6 @@ class Job(drmaa2.Job):
     @job_template.deleter
     def job_template(self):
         del self._job_template
-
 
 
 # Module-level functions

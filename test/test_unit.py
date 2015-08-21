@@ -2,11 +2,17 @@ import unittest
 import drmaa2
 import os
 
+
+import pytest
 import mock
 
-from hamcrest import assert_that, starts_with, ends_with, is_, has_properties, equal_to, contains, has_item
+from hamcrest import assert_that, starts_with, ends_with, is_, has_properties, equal_to, contains, has_item, raises, \
+    calling
+from drmaa2.util.ge import create_job_info
 
 QSUB_OUTPUT = "Your job 764188 (\"lyonstest\") has been submitted"
+
+ONE_JOB = os.path.join(os.path.dirname(__file__), 'data/one_job.txt')
 
 
 class GeneralTestCase(unittest.TestCase):
@@ -47,10 +53,7 @@ class SessionManagerTestCase(unittest.TestCase):
     def test_reservation_session(self):
         session = drmaa2.create_reservation_session()
         name = session.session_name
-        session.close()
-        session = drmaa2.open_reservation_session(name)
-        session.close()
-        drmaa2.destroy_session(name)
+        assert_that(calling(session.close), raises(NotImplementedError))
 
     def test_monitoring_session(self):
         session = drmaa2.open_monitoring_session()
@@ -120,6 +123,17 @@ class JobSessionTestCase(unittest.TestCase):
             assert_that(lines, has_item('#$ -cwd\n'))
             assert_that(lines, has_item('/bin/sleep\n'))
             assert_that(lines, has_item('#$ -q dev-short\n'))
+
+def test_create_job_template():
+
+    with open(ONE_JOB, 'r') as f:
+        job_info = create_job_info(f.readlines())
+        assert_that(job_info, has_properties({'qname': equal_to('prod-r2v'),
+                                              'hostname': ends_with('lyons.hosting.net'),
+                                              'group': equal_to('lyons'),
+                                              'owner': equal_to('mike'),
+                                              'jobnumber': equal_to('647723')}))
+
 
 if __name__ == '__main__':
     unittest.main()
